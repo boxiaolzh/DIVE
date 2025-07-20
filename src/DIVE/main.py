@@ -77,12 +77,12 @@ class DynamicDimBO:
 
             # Off-diagonal elements: Paper formula 18
             if len(self.X) > 10:
-                # When sufficient data: Mᵢⱼ = √(MᵢᵢMⱼⱼ) · (1 - ρᵢⱼ · σᵢⱼ)
+                # Paper formula 18: Mᵢⱼ = -α · ρᵢⱼ · σᵢⱼ · √(MᵢᵢMⱼⱼ)
+                alpha = 0.2  # Scaling factor from paper
                 X_array = np.array(self.X)
                 for i in range(new_dim):
                     for j in range(i + 1, new_dim):
                         try:
-                            # Calculate correlation coefficient ρᵢⱼ
                             rho_ij = abs(np.corrcoef(X_array[:, self.active_dims[i]],
                                                      X_array[:, self.active_dims[j]])[0, 1])
                         except:
@@ -92,9 +92,8 @@ class DynamicDimBO:
                         sigma_ij = 1.0 - abs(normalized_mi[i] - normalized_mi[j]) / max(normalized_mi[i],
                                                                                         normalized_mi[j])
 
-                        # Paper formula 18: Mᵢⱼ = √(MᵢᵢMⱼⱼ) · (1 - ρᵢⱼ · σᵢⱼ)
-                        interaction_factor = 1 - rho_ij * sigma_ij
-                        M_ij = interaction_factor * np.sqrt(new_M[i, i] * new_M[j, j])
+                        # Paper formula 18: Mᵢⱼ = -α · ρᵢⱼ · σᵢⱼ · √(MᵢᵢMⱼⱼ)
+                        M_ij = -alpha * rho_ij * sigma_ij * np.sqrt(new_M[i, i] * new_M[j, j])
                         new_M[i, j] = new_M[j, i] = M_ij
             else:
                 # Insufficient data: set off-diagonal elements to 0 (independence assumption)
@@ -310,8 +309,9 @@ class DynamicDimBO:
             for i in range(new_dim):
                 new_M[i, i] = normalized_mi[i]
 
-            # Paper formula 18: off-diagonal elements Mᵢⱼ = √(MᵢᵢMⱼⱼ) · (1 - ρᵢⱼ · σᵢⱼ)
+            # Paper formula 18: off-diagonal elements
             if len(self.X) > 10:
+                alpha = 0.2  # Scaling factor from paper
                 X_array = np.array(self.X)
                 for i in range(new_dim):
                     for j in range(i + 1, new_dim):
@@ -325,9 +325,8 @@ class DynamicDimBO:
                         sigma_ij = 1.0 - abs(normalized_mi[i] - normalized_mi[j]) / max(normalized_mi[i],
                                                                                         normalized_mi[j])
 
-                        # Core formula: Mᵢⱼ = √(MᵢᵢMⱼⱼ) · (1 - ρᵢⱼ · σᵢⱼ)
-                        interaction_factor = 1 - rho_ij * sigma_ij
-                        M_ij = interaction_factor * np.sqrt(new_M[i, i] * new_M[j, j])
+                        # Paper formula 18: Mᵢⱼ = -α · ρᵢⱼ · σᵢⱼ · √(MᵢᵢMⱼⱼ)
+                        M_ij = -alpha * rho_ij * sigma_ij * np.sqrt(new_M[i, i] * new_M[j, j])
                         new_M[i, j] = new_M[j, i] = M_ij
             else:
                 # Insufficient data: explicitly set off-diagonal elements to 0
@@ -414,6 +413,7 @@ class DynamicDimBO:
 
         # For new dimensions, recalculate off-diagonal elements with other dimensions
         if len(self.X) > 10:
+            alpha = 0.2  # Scaling factor from paper
             X_array = np.array(self.X)
             for i in range(new_size):
                 for j in range(i + 1, new_size):
@@ -431,9 +431,8 @@ class DynamicDimBO:
                         sigma_ij = 1.0 - abs(normalized_mi[i] - normalized_mi[j]) / max(normalized_mi[i],
                                                                                         normalized_mi[j])
 
-                        # Paper formula 18: Mᵢⱼ = √(MᵢᵢMⱼⱼ) · (1 - ρᵢⱼ · σᵢⱼ)
-                        interaction_factor = 1 - rho_ij * sigma_ij
-                        M_ij = interaction_factor * np.sqrt(M_new[i, i] * M_new[j, j])
+                        # Paper formula 18: Mᵢⱼ = -α · ρᵢⱼ · σᵢⱼ · √(MᵢᵢMⱼⱼ)
+                        M_ij = -alpha * rho_ij * sigma_ij * np.sqrt(M_new[i, i] * M_new[j, j])
                         M_new[i, j] = M_new[j, i] = M_ij
 
         # Numerical stability
@@ -474,7 +473,7 @@ class DynamicDimBO:
             self._incremental_update_M_matrix()
         else:
             # Complete reconstruction
-            print("Rebuilding metric matrix (paper formulas: Mᵢᵢ = Ŝ(xᵢ), Mᵢⱼ = √(MᵢᵢMⱼⱼ)·(1-ρᵢⱼ·σᵢⱼ))")
+            print("Rebuilding metric matrix (paper formulas: Mᵢᵢ = Ŝ(xᵢ), Mᵢⱼ = -α·ρᵢⱼ·σᵢⱼ·√(MᵢᵢMⱼⱼ))")
             self._reinitialize_kernel_matrices()
 
         self._last_active_dims = self.active_dims.copy()
