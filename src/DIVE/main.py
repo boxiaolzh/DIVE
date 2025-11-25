@@ -35,6 +35,9 @@ class DynamicDimBO:
         self._model_outdated = True
         self._data_outdated = True
 
+        self.best_feasible_current = float('inf')
+        self.best_feasible_point = None
+
         # Adaptive initialization
         self._adaptive_initialize(initial_samples=initial_samples)
 
@@ -46,9 +49,6 @@ class DynamicDimBO:
         self.sigma = 2.0
         # Only keep M matrix, since S in paper is actually M
         self.M = [np.eye(self.current_active_dim)]
-
-        self.best_feasible_current = float(1)
-        self.best_feasible_point = None
 
         self._select_initial_dimensions()
         self._initialize_kernel_with_mi()
@@ -73,7 +73,7 @@ class DynamicDimBO:
 
             # Diagonal elements: Mᵢᵢ = Ŝ(xᵢ)
             for i in range(new_dim):
-                new_M[i, i] = normalized_mi[i]
+                new_M[i, i] = normalized_mi[i] + 1e-6
 
             # Off-diagonal elements: Paper formula 18
             if len(self.X) > 10:
@@ -93,7 +93,7 @@ class DynamicDimBO:
                                                                                         normalized_mi[j])
 
                         # Paper formula 18: Mᵢⱼ = -α · ρᵢⱼ · σᵢⱼ · √(MᵢᵢMⱼⱼ)
-                        M_ij = -alpha * rho_ij * sigma_ij * np.sqrt(new_M[i, i] * new_M[j, j])
+                        M_ij = -alpha * abs(rho_ij * sigma_ij) * np.sqrt(new_M[i, i] * new_M[j, j])
                         new_M[i, j] = new_M[j, i] = M_ij
             else:
                 # Insufficient data: set off-diagonal elements to 0 (independence assumption)
@@ -106,13 +106,14 @@ class DynamicDimBO:
 
             # Numerical stability
             new_M = (new_M + new_M.T) / 2
-            new_M += 1e-6 * np.eye(new_dim)
 
             # Ensure positive definiteness
             eigenvals = np.linalg.eigvals(new_M)
             if np.min(eigenvals) <= 1e-6:
                 print(f"Warning: M matrix near singular, min eigenvalue: {np.min(eigenvals):.2e}")
-                new_M += (1e-6 - np.min(eigenvals)) * np.eye(new_dim)
+                additional_epsilon = (1e-6 - np.min(eigenvals)) + 1e-8
+                for i in range(new_dim):
+                    new_M[i, i] += additional_epsilon
 
             self.M[0] = new_M
             print(f"Kernel matrix initialization complete, M matrix dimension: {new_dim}")
@@ -307,7 +308,7 @@ class DynamicDimBO:
 
             # Paper formula 17: diagonal elements Mᵢᵢ = Ŝ(xᵢ)
             for i in range(new_dim):
-                new_M[i, i] = normalized_mi[i]
+                new_M[i, i] = normalized_mi[i] + 1e-6
 
             # Paper formula 18: off-diagonal elements
             if len(self.X) > 10:
@@ -326,7 +327,7 @@ class DynamicDimBO:
                                                                                         normalized_mi[j])
 
                         # Paper formula 18: Mᵢⱼ = -α · ρᵢⱼ · σᵢⱼ · √(MᵢᵢMⱼⱼ)
-                        M_ij = -alpha * rho_ij * sigma_ij * np.sqrt(new_M[i, i] * new_M[j, j])
+                        M_ij = -alpha * abs(rho_ij * sigma_ij) * np.sqrt(new_M[i, i] * new_M[j, j])
                         new_M[i, j] = new_M[j, i] = M_ij
             else:
                 # Insufficient data: explicitly set off-diagonal elements to 0
@@ -338,13 +339,14 @@ class DynamicDimBO:
 
         # Numerical stability
         new_M = (new_M + new_M.T) / 2
-        new_M += 1e-6 * np.eye(new_dim)
 
         # Ensure positive definiteness
         eigenvals = np.linalg.eigvals(new_M)
         if np.min(eigenvals) <= 1e-6:
             print(f"Warning: M matrix near singular, min eigenvalue: {np.min(eigenvals):.2e}")
-            new_M += (1e-6 - np.min(eigenvals)) * np.eye(new_dim)
+            additional_epsilon = (1e-6 - np.min(eigenvals)) + 1e-8
+            for i in range(new_dim):
+                new_M[i, i] += additional_epsilon
 
         self.M[-1] = new_M
 
@@ -403,11 +405,11 @@ class DynamicDimBO:
                         m_bar = np.mean(np.diag(self.M[-1]))  # Average of old diagonal elements
                     else:
                         m_bar = 1.0
-                    M_new[i, j] = m_bar * normalized_mi[i]
+                    M_new[i, j] = m_bar * normalized_mi[i] + 1e-6
 
                 # Set retained dimension diagonal elements to 0 first, then update with new MI scores
                 elif i == j and new_dim_i in intersection:
-                    M_new[i, j] = normalized_mi[i]
+                    M_new[i, j] = normalized_mi[i] + 1e-6
 
                 # Off-diagonal elements involving new dimensions are temporarily set to 0
 
@@ -432,17 +434,18 @@ class DynamicDimBO:
                                                                                         normalized_mi[j])
 
                         # Paper formula 18: Mᵢⱼ = -α · ρᵢⱼ · σᵢⱼ · √(MᵢᵢMⱼⱼ)
-                        M_ij = -alpha * rho_ij * sigma_ij * np.sqrt(M_new[i, i] * M_new[j, j])
+                        M_ij = -alpha * abs(rho_ij * sigma_ij) * np.sqrt(M_new[i, i] * M_new[j, j])
                         M_new[i, j] = M_new[j, i] = M_ij
 
         # Numerical stability
         M_new = (M_new + M_new.T) / 2
-        M_new += 1e-6 * np.eye(new_size)
 
         # Ensure positive definiteness
         eigenvals = np.linalg.eigvals(M_new)
         if np.min(eigenvals) <= 1e-6:
-            M_new += (1e-6 - np.min(eigenvals)) * np.eye(new_size)
+            additional_epsilon = (1e-6 - np.min(eigenvals)) + 1e-8
+            for i in range(new_size):
+                M_new[i, i] += additional_epsilon
 
         self.M[-1] = M_new
 
