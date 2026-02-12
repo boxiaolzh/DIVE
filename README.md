@@ -30,10 +30,12 @@ bo.optimize(n_iter=400)
 ## Citation
 
 ```bibtex
-@article{dive2024,
+@inproceedings{liu2025dive,
   title={DIVE: Dynamic Information-Guided Variable Expansion for Deeper Analog Circuit Optimization},
-  author={[Authors]},
-  journal={[Journal]},
-  year={2024}
+  author={Liu, Zhuohua and Xie, Weilun and Zhang, Yuxuan and Wang, Chen and Hu, Yuanqi and Xing, Wei W},
+  booktitle={2025 IEEE/ACM International Conference On Computer Aided Design (ICCAD)},
+  pages={1--9},
+  year={2025},
+  organization={IEEE}
 }
 ```
